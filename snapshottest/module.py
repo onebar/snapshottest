@@ -143,7 +143,8 @@ class SnapshotModule(object):
         with codecs.open(self.filepath, 'w', encoding="utf-8") as snapshot_file:
             snapshots_declarations = []
             for key, value in self.snapshots.items():
-                snapshots_declarations.append('''snapshots['{}'] = {}'''.format(key, pretty(value)))
+                snapshots_declarations.append(
+                    '''snapshots['{}'] = {}'''.format(key, pretty(value)))
 
             imports = '\n'.join([
                 'from {} import {}'.format(module, ', '.join(module_imports))
@@ -167,11 +168,14 @@ snapshots = Snapshot()
             dirname = os.path.dirname(test_filepath)
             snapshot_dir = os.path.join(dirname, "snapshots")
 
-            snapshot_basename = 'snap_{}.py'.format(os.path.splitext(os.path.basename(test_filepath))[0])
+            snapshot_basename = 'snap_{}.py'.format(
+                os.path.splitext(os.path.basename(test_filepath))[0])
             snapshot_filename = os.path.join(snapshot_dir, snapshot_basename)
-            snapshot_module = '{}'.format(os.path.splitext(snapshot_basename)[0])
+            snapshot_module = '{}'.format(
+                os.path.splitext(snapshot_basename)[0])
 
-            cls._snapshot_modules[test_filepath] = SnapshotModule(snapshot_module, snapshot_filename)
+            cls._snapshot_modules[test_filepath] = SnapshotModule(
+                snapshot_module, snapshot_filename)
 
         return cls._snapshot_modules[test_filepath]
 
@@ -216,11 +220,13 @@ class SnapshotTest(object):
     def assert_equals(self, value, snapshot):
         assert value == snapshot
 
-    def assert_match(self, value, name=''):
+    def assert_match(self, value, name='', ignore_fields=None):
+        self.remove_fields_from_dict(value, ignore_fields)
         self.curr_snapshot = name or self.snapshot_counter
         self.visit()
         prev_snapshot = not self.update and self.module[self.test_name]
         if prev_snapshot:
+            self.remove_fields_from_dict(prev_snapshot, ignore_fields)
             try:
                 self.assert_equals(
                     PrettyDiff(value, self),
@@ -237,9 +243,29 @@ class SnapshotTest(object):
     def save_changes(self):
         self.module.save()
 
+    @classmethod
+    def remove_fields_from_dict(cls, dictionary, remove_fields=None):
 
-def assert_match_snapshot(value, name=''):
+        def purge(field, dictionary):
+            if field in dictionary:
+                del dictionary[field]
+            for value in dictionary.values():
+                if isinstance(value, dict):
+                    purge(field, value)
+                if isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict):
+                            purge(field, item)
+
+        if remove_fields is None:
+            remove_fields = []
+        for field in remove_fields:
+            purge(field, dictionary)
+
+
+def assert_match_snapshot(value, name='', ignore_fields=None):
     if not SnapshotTest._current_tester:
-        raise Exception("You need to use assert_match_snapshot in the SnapshotTest context.")
+        raise Exception(
+            "You need to use assert_match_snapshot in the SnapshotTest context.")
 
-    SnapshotTest._current_tester.assert_match(value, name)
+    SnapshotTest._current_tester.assert_match(value, name, ignore_fields=None)
